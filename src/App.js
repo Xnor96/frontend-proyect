@@ -1,28 +1,50 @@
 import React, { useState } from 'react';
 import Navbar from './components/Navbar';
-import ProductList from './components/ProductList';
-import SearchBar from './components/SearchBar';
+import HomePage from './pages/HomePage';
+import CatalogPage from './pages/CatalogPage';
 import CartPage from './pages/CartPage';
 import WishlistPage from './pages/WishlistPage';
-import HomePage from './pages/HomePage';
+import CheckoutPage from './pages/CheckoutPage';
+import ProductDetailsPage from './pages/ProductDetailsPage';
 import useCart from './hooks/useCart';
 
 const App = () => {
   const [currentRoute, setCurrentRoute] = useState('home');
+  const [currentProduct, setCurrentProduct] = useState(null);
   const { cart, addToCart, removeFromCart, clearCart } = useCart();
   const [wishlist, setWishlist] = useState([]);
-  
+
+  const products = [
+    { 
+      id: 1, 
+      name: "Producto 1", 
+      description: "Descripción detallada del producto 1", 
+      price: "$10",
+      category: "Electrónica" 
+    },
+    { 
+      id: 2, 
+      name: "Producto 2", 
+      description: "Descripción detallada del producto 2", 
+      price: "$20",
+      category: "Hogar" 
+    },
+    { 
+      id: 3, 
+      name: "Producto 3", 
+      description: "Descripción detallada del producto 3", 
+      price: "$30",
+      category: "Ropa" 
+    },
+  ];
+
+  const handleProductClick = (product) => {
+    setCurrentProduct(product);
+    setCurrentRoute('product-details');
+  };
+
   const handleAddToWishlist = (product) => {
     setWishlist(prev => [...prev, product]);
-  };
-  
-  const handleRemoveFromWishlist = (productId) => {
-    setWishlist(prev => prev.filter(item => item.id !== productId));
-  };
-  
-  const handleMoveToCart = (product) => {
-    addToCart(product);
-    handleRemoveFromWishlist(product.id);
   };
 
   const renderCurrentRoute = () => {
@@ -31,19 +53,12 @@ const App = () => {
         return <HomePage onNavigate={setCurrentRoute} />;
       case 'catalog':
         return (
-          <div className="container mx-auto py-8">
-            <h1 className="text-2xl font-bold mb-4">Catálogo de Productos</h1>
-            <SearchBar onSearch={(query) => console.log('Búsqueda:', query)} />
-            <ProductList 
-              products={[
-                { id: 1, name: "Producto 1", description: "Descripción 1", price: "$10" },
-                { id: 2, name: "Producto 2", description: "Descripción 2", price: "$20" },
-                { id: 3, name: "Producto 3", description: "Descripción 3", price: "$30" },
-              ]} 
-              onAddToCart={addToCart}
-              onAddToWishlist={handleAddToWishlist}
-            />
-          </div>
+          <CatalogPage 
+            products={products}
+            onAddToCart={addToCart}
+            onAddToWishlist={handleAddToWishlist}
+            onProductClick={handleProductClick}
+          />
         );
       case 'cart':
         return (
@@ -51,27 +66,38 @@ const App = () => {
             cart={cart}
             onRemoveFromCart={removeFromCart}
             onClearCart={clearCart}
+            onCheckout={() => setCurrentRoute('checkout')}
           />
         );
       case 'wishlist':
         return (
           <WishlistPage 
             wishlist={wishlist}
-            onRemoveFromWishlist={handleRemoveFromWishlist}
-            onMoveToCart={handleMoveToCart}
+            onRemoveFromWishlist={(id) => setWishlist(prev => prev.filter(item => item.id !== id))}
+            onMoveToCart={(product) => {
+              addToCart(product);
+              setWishlist(prev => prev.filter(item => item.id !== product.id));
+            }}
+          />
+        );
+      case 'checkout':
+        return <CheckoutPage />;
+      case 'product-details':
+        return (
+          <ProductDetailsPage 
+            currentProduct={currentProduct}
+            onAddToWishlist={handleAddToWishlist}
           />
         );
       default:
         return <HomePage onNavigate={setCurrentRoute} />;
     }
   };
-  
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar onNavigate={setCurrentRoute} currentRoute={currentRoute} />
-      <main>
-        {renderCurrentRoute()}
-      </main>
+      {renderCurrentRoute()}
     </div>
   );
 };
