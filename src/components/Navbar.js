@@ -7,7 +7,7 @@ const Navbar = ({ onNavigate, currentRoute }) => {
         <div className="container mx-auto px-4">
           <div className="flex justify-between h-16">
             <button onClick={() => onNavigate('home')} className="text-white text-2xl font-bold flex items-center">
-              Mishka Complementos
+              Mishka-Beta
             </button>
             
             <div className="flex space-x-4 items-center">
