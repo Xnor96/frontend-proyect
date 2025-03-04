@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import ProductList from '../components/ProductList';
 import SearchBar from '../components/SearchBar';
 import SearchFilters from '../components/SearchFilters';
-import { getProducts } from '../services/products';
+import { fetchProducts, searchProducts, getProductsByCategory } from '../services/api';
 
-const CatalogPage = ({ onAddToCart, onAddToWishlist }) => {
+const CatalogPage = ({ onAddToCart, onAddToWishlist, onProductClick }) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filteredProducts, setFilteredProducts] = useState([]);
@@ -14,11 +14,12 @@ const CatalogPage = ({ onAddToCart, onAddToWishlist }) => {
     priceRange: [0, 1000]
   });
 
-  // Efecto para cargar productos
+  // Efecto para cargar productos desde la API
   useEffect(() => {
     const loadProducts = async () => {
       try {
-        const data = await getProducts();
+        setLoading(true);
+        const data = await fetchProducts();
         setProducts(data);
         setFilteredProducts(data);
       } catch (error) {
@@ -31,60 +32,76 @@ const CatalogPage = ({ onAddToCart, onAddToWishlist }) => {
     loadProducts();
   }, []);
 
-  // Efecto mejorado para manejar búsquedas y filtros
-  useEffect(() => {
-    if (products.length > 0) {
-      let filtered = products;
-
-      // Aplicar búsqueda
-      if (searchQuery.trim()) {
-        filtered = filtered.filter(product => 
-          product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          product.category.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-      }
-
-      // Aplicar filtros de categoría
-      if (activeFilters.categories.length > 0) {
-        filtered = filtered.filter(product => 
-          activeFilters.categories.includes(product.category)
-        );
-      }
-
-      // Aplicar filtros de precio
-      filtered = filtered.filter(product => {
-        const price = parseFloat(product.price.replace('$', ''));
-        return price >= activeFilters.priceRange[0] && price <= activeFilters.priceRange[1];
-      });
-
-      setFilteredProducts(filtered);
-    }
-  }, [searchQuery, products, activeFilters]);
-
-  // Manejador de búsqueda mejorado
-  const handleSearch = (query) => {
+  // Manejar búsqueda
+  const handleSearch = async (query) => {
     setSearchQuery(query);
+    
+    try {
+      setLoading(true);
+      if (query.trim() === '') {
+        // Si la búsqueda está vacía, mostrar todos los productos (con filtros aplicados)
+        applyFilters(products, activeFilters);
+      } else {
+        // Buscar productos por la consulta
+        const results = await searchProducts(query);
+        // Aplicar filtros a los resultados de búsqueda
+        applyFilters(results, activeFilters);
+      }
+    } catch (error) {
+      console.error('Error searching products:', error);
+      setFilteredProducts([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Manejador de filtros mejorado
-  const handleFilterChange = (filters) => {
+  // Aplicar filtros a los productos
+  const applyFilters = (productsToFilter, filters) => {
+    let filtered = [...productsToFilter];
+    
+    // Filtrar por categorías
+    if (filters.categories.length > 0) {
+      filtered = filtered.filter(product => 
+        filters.categories.includes(product.category)
+      );
+    }
+
+    // Filtrar por rango de precio
+    filtered = filtered.filter(product => {
+      const price = parseFloat(product.price.toString().replace('$', ''));
+      return price >= filters.priceRange[0] && price <= filters.priceRange[1];
+    });
+
+    setFilteredProducts(filtered);
+  };
+
+  // Manejar cambio de filtros
+  const handleFilterChange = async (filters) => {
     setActiveFilters(filters);
+    
+    try {
+      setLoading(true);
+      
+      // Si hay una búsqueda activa, aplicar filtros a los resultados de búsqueda
+      if (searchQuery.trim() !== '') {
+        const searchResults = await searchProducts(searchQuery);
+        applyFilters(searchResults, filters);
+      } 
+      // Si hay filtro de categoría, obtener productos por categoría
+      else if (filters.categories.length === 1) {
+        const categoryProducts = await getProductsByCategory(filters.categories[0]);
+        applyFilters(categoryProducts, filters);
+      } 
+      // De lo contrario, aplicar filtros a todos los productos
+      else {
+        applyFilters(products, filters);
+      }
+    } catch (error) {
+      console.error('Error applying filters:', error);
+    } finally {
+      setLoading(false);
+    }
   };
-
-  if (loading) {
-    return (
-      <div className="container mx-auto">
-        <div className="text-center py-8">
-          <div className="animate-pulse">
-            <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto mb-4"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
-          </div>
-          <p className="mt-4">Cargando productos...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -101,11 +118,16 @@ const CatalogPage = ({ onAddToCart, onAddToWishlist }) => {
             onSearch={handleSearch}
             initialValue={searchQuery}
           />
-          {filteredProducts.length > 0 ? (
+          {loading ? (
+            <div className="text-center py-8">
+              <p>Cargando productos...</p>
+            </div>
+          ) : filteredProducts.length > 0 ? (
             <ProductList 
               products={filteredProducts}
               onAddToCart={onAddToCart}
               onAddToWishlist={onAddToWishlist}
+              onProductClick={onProductClick}
             />
           ) : (
             <div className="text-center py-8">

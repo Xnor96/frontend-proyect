@@ -1,7 +1,14 @@
 import React from 'react';
 
 const CheckoutSummary = ({ cart, onRemoveItem }) => {
-  const subtotal = cart.reduce((sum, item) => sum + parseFloat(item.price.slice(1)), 0);
+  const subtotal = cart.reduce((sum, item) => {
+    // Manejar el precio como número o string
+    const price = typeof item.price === 'string' 
+      ? parseFloat(item.price.replace('$', '')) 
+      : item.price;
+    return sum + price;
+  }, 0);
+  
   const shipping = subtotal >= 50 ? 0 : 10;
   const total = subtotal + shipping;
 
@@ -16,7 +23,9 @@ const CheckoutSummary = ({ cart, onRemoveItem }) => {
           <div key={item.id} className="checkout-summary__item flex justify-between py-2 border-b">
             <div>
               <p className="font-medium">{item.name}</p>
-              <p className="text-gray-600">{item.price}</p>
+              <p className="text-gray-600">
+                {typeof item.price === 'string' ? item.price : `$${item.price}`}
+              </p>
             </div>
             <button
               onClick={() => onRemoveItem(item.id)}

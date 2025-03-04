@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import HomePage from './pages/HomePage';
 import CatalogPage from './pages/CatalogPage';
@@ -6,58 +6,76 @@ import CartPage from './pages/CartPage';
 import WishlistPage from './pages/WishlistPage';
 import CheckoutPage from './pages/CheckoutPage';
 import ProductDetailsPage from './pages/ProductDetailsPage';
+import ReturnOrderPage from './pages/ReturnOrderPage';
 import useCart from './hooks/useCart';
+import { fetchProducts } from './services/api';
 
 const App = () => {
   const [currentRoute, setCurrentRoute] = useState('home');
-  const [currentProduct, setCurrentProduct] = useState(null);
+  const [currentProductId, setCurrentProductId] = useState(null);
   const { cart, addToCart, removeFromCart, clearCart } = useCart();
   const [wishlist, setWishlist] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const products = [
-    { 
-      id: 1, 
-      name: "Producto 1", 
-      description: "Descripción detallada del producto 1", 
-      price: "$10",
-      category: "Electrónica" 
-    },
-    { 
-      id: 2, 
-      name: "Producto 2", 
-      description: "Descripción detallada del producto 2", 
-      price: "$20",
-      category: "Hogar" 
-    },
-    { 
-      id: 3, 
-      name: "Producto 3", 
-      description: "Descripción detallada del producto 3", 
-      price: "$30",
-      category: "Ropa" 
-    },
-  ];
+  // Cargar productos al iniciar
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        const data = await fetchProducts();
+        setProducts(data);
+      } catch (error) {
+        console.error('Error loading products:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const handleProductClick = (product) => {
-    setCurrentProduct(product);
+    loadProducts();
+  }, []);
+
+  const handleProductClick = (productId) => {
+    setCurrentProductId(productId);
     setCurrentRoute('product-details');
   };
 
   const handleAddToWishlist = (product) => {
-    setWishlist(prev => [...prev, product]);
+    setWishlist(prev => {
+      // Evitar duplicados
+      if (prev.some(item => item.id === product.id)) {
+        return prev;
+      }
+      return [...prev, product];
+    });
+  };
+
+  const handleRemoveFromWishlist = (productId) => {
+    setWishlist(prev => prev.filter(item => item.id !== productId));
   };
 
   const renderCurrentRoute = () => {
+    if (loading && (currentRoute === 'catalog' || currentRoute === 'product-details')) {
+      return <div className="container mx-auto py-8 text-center">Cargando...</div>;
+    }
+
     switch (currentRoute) {
       case 'home':
         return <HomePage onNavigate={setCurrentRoute} />;
       case 'catalog':
         return (
           <CatalogPage 
-            products={products}
             onAddToCart={addToCart}
             onAddToWishlist={handleAddToWishlist}
             onProductClick={handleProductClick}
+          />
+        );
+      case 'product-details':
+        return (
+          <ProductDetailsPage 
+            currentProductId={currentProductId}
+            onAddToCart={addToCart}
+            onAddToWishlist={handleAddToWishlist}
+            onNavigate={setCurrentRoute}
           />
         );
       case 'cart':
@@ -73,20 +91,26 @@ const App = () => {
         return (
           <WishlistPage 
             wishlist={wishlist}
-            onRemoveFromWishlist={(id) => setWishlist(prev => prev.filter(item => item.id !== id))}
+            onRemoveFromWishlist={handleRemoveFromWishlist}
             onMoveToCart={(product) => {
               addToCart(product);
-              setWishlist(prev => prev.filter(item => item.id !== product.id));
+              handleRemoveFromWishlist(product.id);
             }}
           />
         );
       case 'checkout':
-        return <CheckoutPage />;
-      case 'product-details':
         return (
-          <ProductDetailsPage 
-            currentProduct={currentProduct}
-            onAddToWishlist={handleAddToWishlist}
+          <CheckoutPage 
+            cart={cart}
+            onRemoveFromCart={removeFromCart}
+            onClearCart={clearCart}
+            onNavigate={setCurrentRoute}
+          />
+        );
+      case 'return-order':
+        return (
+          <ReturnOrderPage 
+            onSubmit={() => setCurrentRoute('home')}
           />
         );
       default:
@@ -96,8 +120,14 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar onNavigate={setCurrentRoute} currentRoute={currentRoute} />
-      {renderCurrentRoute()}
+      <Navbar 
+        onNavigate={setCurrentRoute} 
+        currentRoute={currentRoute} 
+        cartItemCount={cart.length}
+      />
+      <main>
+        {renderCurrentRoute()}
+      </main>
     </div>
   );
 };
